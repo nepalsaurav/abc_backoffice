@@ -1,0 +1,123 @@
+{% extends "portfolio_snapshot/base_portfolio.html" %}
+
+{% block title %}Import Transactions Preview - Portfolio Snapshot{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0">Confirm Import Data</h3>
+            <p class="text-muted mb-0">Review the parsed NEPSE transactions below.</p>
+        </div>
+    </div>
+
+    <form method="POST" action="{% url 'portfolio_snapshot:confirm_import' %}">
+        {% csrf_token %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 0.8rem;">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th scope="col" class="ps-3">
+                                    <input class="form-check-input" type="checkbox" id="selectAll" checked>
+                                </th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Transaction No</th>
+                                <th scope="col">Stock (Type)</th>
+                                <th scope="col">Side</th>
+                                <th scope="col" class="text-end">Qty</th>
+                                <th scope="col" class="text-end">Rate</th>
+                                <th scope="col" class="text-end">Amount</th>
+                                <th scope="col" class="text-end">NEPSE/SEBO</th>
+                                <th scope="col" class="text-end">Broker</th>
+                                <th scope="col" class="text-end">DP Charge</th>
+                                <th scope="col" class="pe-3 text-end">Total Fees</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for txn in transactions %}
+                            <tr>
+                                <td class="ps-3">
+                                    <input class="form-check-input row-checkbox" type="checkbox" name="selected_indices" value="{{ forloop.counter0 }}" checked>
+                                </td>
+                                <td class="text-nowrap">{{ txn.transaction_date }}</td>
+                                <td class="text-muted">{{ txn.transaction_no }}</td>
+                                <td>
+                                    <span class="fw-bold">{{ txn.stock }}</span><br>
+                                    <small class="text-muted">{{ txn.share_type|default:"-" }}</small>
+                                </td>
+                                <td>
+                                    {% if txn.transaction_type == 'Buy' %}
+                                    <span class="badge bg-success-subtle text-success">Buy</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">Sell</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-medium">{{ txn.quantity }}</td>
+                                <td class="text-end">{{ txn.rate|floatformat:2 }}</td>
+                                <td class="text-end fw-bold">{{ txn.amount|floatformat:2 }}</td>
+                                <td class="text-end text-muted">
+                                    {{ txn.nepse_commission|floatformat:2 }} / {{ txn.sebo_commission|floatformat:2 }}
+                                </td>
+                                <td class="text-end text-muted">{{ txn.broker_commission|floatformat:2 }}</td>
+                                <td class="text-end text-primary">{{ txn.dp_charge|floatformat:2 }}</td>
+                                <td class="pe-3 text-end fw-medium">
+                                    {# Simple way to show total of all four fee fields #}
+                                    {{ txn.nepse_commission|add:txn.sebo_commission|add:txn.broker_commission|add:txn.dp_charge|floatformat:2 }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="12" class="text-center py-5 text-muted">
+                                    <i class="bi bi-file-earmark-x display-4 d-block mb-2"></i>
+                                    No valid transactions found in the file.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small">Total Rows: <strong>{{ transactions|length }}</strong></span>
+                </div>
+                <div>
+                    <a href="{% url 'portfolio_snapshot:import_transactions' %}" class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Re-upload
+                    </a>
+                    {% if transactions %}
+                    <button type="submit" class="btn btn-success px-4 shadow-sm">
+                        <i class="bi bi-cloud-upload me-1"></i> Save to Database
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+        });
+        
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (!this.checked) {
+                    selectAll.checked = false;
+                } else if (document.querySelectorAll('.row-checkbox:checked').length === checkboxes.length) {
+                    selectAll.checked = true;
+                }
+            });
+        });
+    });
+</script>
+{% endblock content %}

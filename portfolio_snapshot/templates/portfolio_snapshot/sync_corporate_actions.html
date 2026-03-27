@@ -1,0 +1,70 @@
+{% extends "portfolio_snapshot/base_portfolio.html" %}
+
+{% block title %}Portfolio Snapshot - Sync Corporate Actions{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h1 class="h3 mb-0 text-gray-800">Corporate Actions Sync</h1>
+            <p class="text-muted mb-0">Manually sync corporate actions and view recent activity.</p>
+        </div>
+        <div class="col-auto">
+            <form method="post" action="{% url 'portfolio_snapshot:sync_corporate_actions' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary d-flex align-items-center shadow-sm">
+                    <i class="bi bi-arrow-repeat me-2"></i> Sync Now
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recent Syncs Card -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <h6 class="m-0 font-weight-bold text-dark">Recent Synchronization Activity</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" class="ps-4">Symbol</th>
+                            <th scope="col">Last Sync Date</th>
+                            <th scope="col">Actions Found</th>
+                            <th scope="col" class="text-end pe-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sync in recent_syncs %}
+                        <tr>
+                            <td class="ps-4 fw-medium">{{ sync.symbol }}</td>
+                            <td>{{ sync.last_fetch_date|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if sync.data and sync.data|length > 0 %}
+                                    <span class="badge bg-info text-dark rounded-pill">{{ sync.data|length }}</span>
+                                {% else %}
+                                    <span class="text-muted small">None</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    <i class="bi bi-check-circle me-1"></i> Success
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+                                No corporate actions synchronized yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

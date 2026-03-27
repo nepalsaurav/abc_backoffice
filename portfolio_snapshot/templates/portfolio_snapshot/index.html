@@ -1,0 +1,16 @@
+{% extends "portfolio_snapshot/base_portfolio.html" %}
+{% load static %}
+
+{% block title %}Portfolio Snapshot - Overview{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Svelte App Mounting Target -->
+    <div id="svelte-app"></div>
+</div>
+{% endblock content %}
+
+{% block app_scripts %}
+<!-- Svelte Application Bundle -->
+<script src="{% static 'portfolio_snapshot/portfolio_dashboard/main.js' %}"></script>
+{% endblock app_scripts %}
