@@ -3,6 +3,9 @@
 
 {% block title %}Portfolio Snapshot - Overview{% endblock %}
 
+
+
+
 {% block content %}
 <div class="container-fluid">
     <!-- Svelte App Mounting Target -->
@@ -11,6 +14,9 @@
 {% endblock content %}
 
 {% block app_scripts %}
+<script>
+    window.csrfToken = "{{ csrf_token }}"
+</script>
 <!-- Svelte Application Bundle -->
-<script src="{% static 'portfolio_snapshot/portfolio_dashboard/main.js' %}"></script>
+<script src="{% static 'portfolio_snapshot/main.js' %}" type="module"></script>
 {% endblock app_scripts %}

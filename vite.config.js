@@ -9,7 +9,8 @@ export default defineConfig({
   plugins: [svelte()],
   resolve: {
     alias: {
-      '@components': path.resolve(__dirname, 'assets/components')
+      '@components': path.resolve(__dirname, 'assets/components'),
+      '@utils': path.resolve(__dirname, 'assets/utils')
     }
   },
   build: {

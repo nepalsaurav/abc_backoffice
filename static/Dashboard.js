@@ -1,0 +1,1 @@
+import{a as e,o as t}from"./portfolio_snapshot/main.js";var n=t(`<h1>this is dashboard page</h1>`);function r(t){e(t,n())}export{r as default};

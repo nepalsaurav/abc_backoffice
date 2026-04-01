@@ -3,18 +3,7 @@
 {% block active_app %}Portfolio Snapshot{% endblock %}
 
 {% block navbar_menu %}
-<ul class="nav nav-pills" style="font-size: 0.85rem;">
-  <li class="nav-item">
-    <a class="nav-link py-1 px-3 fw-medium rounded-2 {% if request.resolver_match.url_name == 'index' %}active shadow-sm{% else %}text-muted hover-bg-light{% endif %}"
-      href="{% url 'portfolio_snapshot:index' %}"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a>
-  </li>
-  <li class="nav-item ms-1">
-    <a class="nav-link py-1 px-3 fw-medium rounded-2 {% if request.resolver_match.url_name == 'import_transactions' %}active shadow-sm{% else %}text-muted hover-bg-light{% endif %}"
-      href="{% url 'portfolio_snapshot:import_transactions' %}"><i class="bi bi-file-earmark-arrow-up me-1"></i> Import Transactions</a>
-  </li>
-  <li class="nav-item ms-1">
-    <a class="nav-link py-1 px-3 fw-medium rounded-2 {% if request.resolver_match.url_name == 'sync_corporate_actions' %}active shadow-sm{% else %}text-muted hover-bg-light{% endif %}"
-      href="{% url 'portfolio_snapshot:sync_corporate_actions' %}"><i class="bi bi-arrow-repeat me-1"></i> Corporate Actions</a>
-  </li>
-</ul>
+  <div id="navbar_svelte">
+      
+  </div>
 {% endblock navbar_menu %}

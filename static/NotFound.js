@@ -1,0 +1,1 @@
+import{n as e,t}from"./portfolio_snapshot/main.js";var n=e(`<h1>sorry page not found</h1>`);function r(e){t(e,n())}export{r as default};

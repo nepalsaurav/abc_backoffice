@@ -1,9 +1,13 @@
 from django.urls import path
 from . import views
 
-app_name = 'portfolio_snapshot'
 urlpatterns = [
-    path('', views.index, name='index'),
-    path('import/', views.import_transactions, name='import_transactions'),
-    path('sync-corporate-actions/', views.sync_corporate_actions, name='sync_corporate_actions'),
+    path('portfolio_snapshot/', views.index, name='index'),
+    path('api/portfolio_snapshot/import_transactions/',
+         views.import_transactions, name='import_transactions'),
+    path('api/portfolio_snapshot/sync_corporate_actions/',
+         views.sync_corporate_actions, name='sync_corporate_actions'),
+    path('api/portfolio_snapshot/corporate_actions/',
+         views.corporate_action_dashboard, name='corporate_actions'),
+    path('api/portfolio_snapshot/test', views.testing, name='testing'),
 ]
