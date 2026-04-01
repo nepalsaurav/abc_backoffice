@@ -7,6 +7,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from portfolio_snapshot.models import DailyTransaction
+from portfolio_snapshot.utils.portfolio_calculations import portfolio_calculation
 
 
 @login_required
@@ -175,72 +176,24 @@ def corporate_action_dashboard(requests):
     })
 
 
-def testing(request):
-    client_name = "LATA CHAUDHARY (LC456959)"
+from django.http import JsonResponse
 
-    # The Raw PostgreSQL Query
-    query = """
-    WITH client_bounds AS (
-        -- Calculate date range for the client once
-        SELECT MIN(date) as start_date, MAX(date) as end_date
-        FROM daily_transactions 
-        WHERE client_name = %s
+def portfolio_snapshot_dashboard(request):
+    # Read the client_name from the URL query string
+    client_name = request.GET.get("client_name")
+
+    if not client_name:
+        return JsonResponse({
+            "status": "error",
+            "message": "Missing 'client_name' in query parameters."
+        }, status=400)
+
+    results = portfolio_calculation(
+        {
+            "client_name": client_name
+        }
     )
-    (
-        -- 1. Transactions
-        SELECT 
-            id, 
-            symbol, 
-            date AS event_date, 
-            'Transaction' AS source, 
-            'daily_transactions' AS collection_name, 
-            jsonb_build_object(
-                'trn_no', trn_no, 
-                'client_name', client_name,
-                'trn_type', trn_type,
-                'qty', qty, 
-                'rate', rate,
-                'broker_commission', broker_commission,
-                'nepse_commission', nepse_commission,
-                'sebo_commission', sebo_commission,
-                'dp_charge', dp_charge
-            ) AS metadata
-        FROM daily_transactions 
-        WHERE client_name = %s
-
-        UNION ALL
-
-        -- 2. Corporate Actions (All fields included)
-        SELECT 
-            ca.id, 
-            ca.symbol, 
-            ca.book_close_date AS event_date, 
-            ca.corporate_action_type AS source, 
-            'corporate_actions' AS collection_name, 
-            jsonb_build_object(
-                'corporate_action_type', ca.corporate_action_type,
-                'listing_date', ca.listing_date,
-                'bonus_pct', ca.bonus_pct, 
-                'cash_dividend_pct', ca.cash_dividend_pct,
-                'right_share_pct', ca.right_share_pct
-            ) AS metadata
-        FROM corporate_actions ca, client_bounds cb
-        WHERE ca.book_close_date BETWEEN cb.start_date AND cb.end_date
-    )
-    ORDER BY event_date ASC;
-    """
-
-    with connection.cursor() as cursor:
-        # We pass client_name twice: once for the CTE and once for the Transaction filter
-        cursor.execute(query, [client_name, client_name])
-
-        # Helper to map column names to row values
-        columns = [col[0] for col in cursor.description]
-        results = [
-            dict(zip(columns, row)) 
-            for row in cursor.fetchall()
-        ]
-
+    
     return JsonResponse({
         "status": "success",
         "result": results

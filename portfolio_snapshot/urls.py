@@ -9,5 +9,5 @@ urlpatterns = [
          views.sync_corporate_actions, name='sync_corporate_actions'),
     path('api/portfolio_snapshot/corporate_actions/',
          views.corporate_action_dashboard, name='corporate_actions'),
-    path('api/portfolio_snapshot/test', views.testing, name='testing'),
+    path('api/portfolio_snapshot/dashboard', views.portfolio_snapshot_dashboard, name='testing'),
 ]
