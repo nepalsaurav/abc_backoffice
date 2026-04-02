@@ -66,6 +66,10 @@ def import_transactions(request):
         transactions = []
 
         for row in records:
+            commission = row["Broker Commission"] + row["Nepse Commission"]
+            total_commsion = commission / 0.994
+            regulatory_fee = round(total_commsion, 2) - commission
+
             trn = DailyTransaction(
                 trn_no=str(row["Transaction No."]),
                 client_name=row["Client Name"],
@@ -74,6 +78,7 @@ def import_transactions(request):
                 date=row["Parsed Date"],
                 qty=row["Qty."],
                 rate=row["Rate"],
+                regulatory_fee=regulatory_fee,
                 broker_commission=row["Broker Commission"],
                 nepse_commission=row["Nepse Commission"],
                 sebo_commission=row["Sebo Commission"],
@@ -176,8 +181,6 @@ def corporate_action_dashboard(requests):
     })
 
 
-from django.http import JsonResponse
-
 def portfolio_snapshot_dashboard(request):
     # Read the client_name from the URL query string
     client_name = request.GET.get("client_name")
@@ -193,8 +196,29 @@ def portfolio_snapshot_dashboard(request):
             "client_name": client_name
         }
     )
-    
+
     return JsonResponse({
         "status": "success",
         "result": results
     })
+
+
+def nepse_price(request):
+    from nepse import Nepse
+    nepse = Nepse()
+    # This is temporary, until nepse sorts its ssl certificate problem
+    nepse.setTLSVerification(False)
+
+    try:
+        resp = nepse.getPriceVolume()
+    
+        return JsonResponse({
+            "status": "success",
+            "resp": resp,
+        }, safe=False)
+    except Exception as e:
+        return JsonResponse({
+            "status": "failed",
+            "resp": str(e),
+        }, safe=False)
+        pass

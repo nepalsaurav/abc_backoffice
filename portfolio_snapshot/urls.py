@@ -10,4 +10,6 @@ urlpatterns = [
     path('api/portfolio_snapshot/corporate_actions/',
          views.corporate_action_dashboard, name='corporate_actions'),
     path('api/portfolio_snapshot/dashboard', views.portfolio_snapshot_dashboard, name='testing'),
+    
+    path('api/portfolio_snapshot/price', views.nepse_price, name='nepse_price'),
 ]

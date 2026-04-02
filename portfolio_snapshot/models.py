@@ -22,7 +22,8 @@ class DailyTransaction(models.Model):
     nepse_commission = models.DecimalField(max_digits=20, decimal_places=4)
     sebo_commission = models.DecimalField(max_digits=20, decimal_places=4)
     dp_charge = models.DecimalField(max_digits=20, decimal_places=4)
-    
+    regulatory_fee = models.DecimalField(max_digits=20, decimal_places=4)
+
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 

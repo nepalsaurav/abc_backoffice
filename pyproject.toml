@@ -11,9 +11,13 @@ dependencies = [
     "django-ninja>=1.6.2",
     "fastexcel>=0.19.0",
     "joblib>=1.5.3",
+    "nepse",
     "openpyxl>=3.1.5",
     "polars>=1.39.3",
     "psycopg2-binary>=2.9.11",
     "pyarrow>=23.0.1",
     "requests>=2.33.1",
 ]
+
+[tool.uv.sources]
+nepse = { git = "https://github.com/basic-bgnr/NepseUnofficialApi" }

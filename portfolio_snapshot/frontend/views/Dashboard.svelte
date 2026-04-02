@@ -4,6 +4,7 @@
   import TransactionsHistory from "../components/TransactionsHistory.svelte";
   import CurrentHolding from "../components/CurrentHolding.svelte";
   import SectorDistribution from "../components/SectorDistribution.svelte";
+  import Overview from "../components/Overview.svelte";
 
   let client_name = $state("LATA CHAUDHARY (LC456959)");
   let portfolioDetails = $state(null);
@@ -55,51 +56,51 @@
   }
 </script>
 
-<ul class="nav nav-tabs mb-4">
-  <li class="nav-item">
-    <button
-      class="nav-link {activeTab === 'overview' ? 'active fw-bold' : ''}"
-      onclick={() => setActiveTab("overview")}>
-      Overview
-    </button>
-  </li>
-  <li class="nav-item">
-    <button
-      class="nav-link {activeTab === 'holdings' ? 'active fw-bold' : ''}"
-      onclick={() => setActiveTab("holdings")}>
-      Current Holding
-    </button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link {activeTab === 'sector' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("sector")}>
-      Sector Distribution
-    </button>
-  </li>
-  <li class="nav-item">
-    <button
-      class="nav-link {activeTab === 'transaction_history' ? 'active fw-bold' : ''}"
-      onclick={() => setActiveTab("transaction_history")}>
-      Transaction History
-    </button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link {activeTab === 'pnl' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("pnl")}>
-      P&L
-    </button>
-  </li>
-</ul>
-
 {#if error}
   <p style="color: red;">Error: {error.message || error}</p>
 {:else if !portfolioDetails}
   <Loading />
 {:else}
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+      <button
+        class="nav-link {activeTab === 'overview' ? 'active fw-bold' : ''}"
+        onclick={() => setActiveTab("overview")}>
+        Overview
+      </button>
+    </li>
+    <li class="nav-item">
+      <button
+        class="nav-link {activeTab === 'holdings' ? 'active fw-bold' : ''}"
+        onclick={() => setActiveTab("holdings")}>
+        Current Holding
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link {activeTab === 'sector' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("sector")}>
+        Sector Distribution
+      </button>
+    </li>
+    <li class="nav-item">
+      <button
+        class="nav-link {activeTab === 'transaction_history' ? 'active fw-bold' : ''}"
+        onclick={() => setActiveTab("transaction_history")}>
+        Transaction History
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link {activeTab === 'pnl' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("pnl")}>
+        P&L
+      </button>
+    </li>
+  </ul>
+
   {#if activeTab === "overview"}
-    {@render portfolioValue(portfolioDetails.portfolio_history)}
+    <Overview holdings={portfolioDetails.current_balance} />
   {/if}
 
   {#if activeTab === "holdings"}
-    <CurrentHolding holdings={portfolioDetails.portfolio_history} />
+    <!-- <CurrentHolding holdings={portfolioDetails.portfolio_history} /> -->
   {/if}
 
   {#if activeTab === "sector"}
@@ -110,9 +111,3 @@
     <TransactionsHistory history={portfolioDetails.client_ledger} />
   {/if}
 {/if}
-
-{#snippet portfolioValue(portfolioHistory)}
-  {@const value = calculatePortfolioValue(portfolioHistory)}
-  <p>portfolio value</p>
-  {JSON.stringify(value)}
-{/snippet}
