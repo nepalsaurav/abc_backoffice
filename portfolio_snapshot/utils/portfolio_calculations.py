@@ -38,22 +38,42 @@ def combine_query(client_name: str):
 
         UNION ALL
 
-        -- 2. Corporate Actions
+        -- 2. Corporate Actions (Phase 1: Book Close / Provisional)
         SELECT 
             ca.id, 
             ca.symbol, 
-            COALESCE(ca.listing_date, ca.book_close_date) AS event_date, 
-            ca.corporate_action_type AS source, 
+            ca.book_close_date AS event_date, 
+            'corporate_action' AS source, 
             'corporate_actions' AS collection_name, 
             jsonb_build_object(
                 'corporate_action_type', ca.corporate_action_type,
-                'listing_date', ca.listing_date,
+                'action_stage', 'book_close',
                 'bonus_pct', ca.bonus_pct, 
                 'cash_dividend_pct', ca.cash_dividend_pct,
                 'right_share_pct', ca.right_share_pct
             ) AS metadata
         FROM corporate_actions ca, client_bounds cb
         WHERE ca.book_close_date BETWEEN cb.start_date AND cb.end_date
+
+        UNION ALL
+
+        -- 3. Corporate Actions (Phase 2: Listing / Tradable)
+        SELECT 
+            ca.id, 
+            ca.symbol, 
+            ca.listing_date AS event_date, 
+            'corporate_action' AS source, 
+            'corporate_actions' AS collection_name, 
+            jsonb_build_object(
+                'corporate_action_type', ca.corporate_action_type,
+                'action_stage', 'listing',
+                'bonus_pct', ca.bonus_pct, 
+                'cash_dividend_pct', ca.cash_dividend_pct,
+                'right_share_pct', ca.right_share_pct
+            ) AS metadata
+        FROM corporate_actions ca, client_bounds cb
+        WHERE ca.listing_date IS NOT NULL 
+          AND ca.book_close_date BETWEEN cb.start_date AND cb.end_date
     )
     ORDER BY event_date ASC;
     """
@@ -237,45 +257,45 @@ def handle_sell_transactions(
 
 
 def handle_corporate_actions(
-    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger, action_type
+    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger
 ):
-    total_held = sum(batch["qty"] for batch in holdings[symbol])
-    if total_held <= 0:
-        return
-
+    action_stage = meta.get("action_stage")
+    action_type = meta.get("corporate_action_type")
     event_date = row.get("event_date")
+    ca_id = row.get("id")
     base_price = BASE_PRICE.get(symbol, DEFAULT_BASE_PRICE)
-    is_provisional = False if meta.get("listing_date") else True
 
-    if action_type == "bonus":
-        bonus_pct = meta.get("bonus_pct", 0)
-        bonus_qty = int(total_held * (bonus_pct / 100))
-        if bonus_qty > 0:
-            current_balance[symbol] += bonus_qty
-            cost = bonus_qty * base_price
+    # --- PHASE 1: BOOK CLOSE (Calculate shares, mark as provisional) ---
+    if action_stage == "book_close":
+        # Calculate holdings at this point (excluding any pending provisionals)
+        total_held = sum(batch["qty"] for batch in holdings[symbol] if not batch.get("is_provisional", False))
+        
+        if total_held <= 0:
+            return
 
-            holdings[symbol].append(
-                {
+        if action_type == "bonus":
+            bonus_pct = meta.get("bonus_pct", 0)
+            bonus_qty = int(total_held * (bonus_pct / 100))
+            if bonus_qty > 0:
+                current_balance[symbol] += bonus_qty
+                cost = bonus_qty * base_price
+
+                # Append as provisional. WACC is NOT updated yet.
+                holdings[symbol].append({
                     "date": event_date,
                     "qty": bonus_qty,
                     "rate": base_price,
                     "type": "bonus",
-                    "is_provisional": is_provisional,
-                }
-            )
+                    "is_provisional": True,
+                    "ca_id": ca_id,
+                    "cost": cost
+                })
 
-            if not is_provisional:
-                wacc_state[symbol]["qty"] += bonus_qty
-                wacc_state[symbol]["cost"] += cost
-
-            client_ledger.append(
-                {
+                client_ledger.append({
                     "date": event_date,
                     "symbol": symbol,
                     "trn_no": "CORP_ACTION",
-                    "transaction_type": "Bonus Share"
-                    if not is_provisional
-                    else "Bonus Share (Provisional)",
+                    "transaction_type": "Bonus Share (Provisional)",
                     "in_qty": bonus_qty,
                     "out_qty": 0,
                     "rate": base_price,
@@ -289,38 +309,30 @@ def handle_corporate_actions(
                     "wacc": round(get_current_wacc(wacc_state, symbol), 4),
                     "balance_qty": current_balance[symbol],
                     "remarks": f"{bonus_pct}% Bonus Declared",
-                }
-            )
+                })
 
-    elif action_type == "right_share":
-        right_pct = meta.get("right_share_pct", 0)
-        right_qty = int(total_held * (right_pct / 100))
-        if right_qty > 0:
-            current_balance[symbol] += right_qty
-            cost = right_qty * base_price
+        elif action_type == "right_share":
+            right_pct = meta.get("right_share_pct", 0)
+            right_qty = int(total_held * (right_pct / 100))
+            if right_qty > 0:
+                current_balance[symbol] += right_qty
+                cost = right_qty * base_price
 
-            holdings[symbol].append(
-                {
+                holdings[symbol].append({
                     "date": event_date,
                     "qty": right_qty,
                     "rate": base_price,
                     "type": "right_share",
-                    "is_provisional": is_provisional,
-                }
-            )
+                    "is_provisional": True,
+                    "ca_id": ca_id,
+                    "cost": cost
+                })
 
-            if not is_provisional:
-                wacc_state[symbol]["qty"] += right_qty
-                wacc_state[symbol]["cost"] += cost
-
-            client_ledger.append(
-                {
+                client_ledger.append({
                     "date": event_date,
                     "symbol": symbol,
                     "trn_no": "CORP_ACTION",
-                    "transaction_type": "Right Share"
-                    if not is_provisional
-                    else "Right Share (Provisional)",
+                    "transaction_type": "Right Share (Provisional)",
                     "in_qty": right_qty,
                     "out_qty": 0,
                     "rate": base_price,
@@ -334,34 +346,71 @@ def handle_corporate_actions(
                     "wacc": round(get_current_wacc(wacc_state, symbol), 4),
                     "balance_qty": current_balance[symbol],
                     "remarks": f"{right_pct}% Right Share Issued",
-                }
-            )
+                })
 
-    elif action_type == "cash_dividend":
-        div_pct = meta.get("cash_dividend_pct", 0)
-        gross_dividend = total_held * base_price * (div_pct / 100)
+        elif action_type == "cash_dividend":
+            div_pct = meta.get("cash_dividend_pct", 0)
+            gross_dividend = total_held * base_price * (div_pct / 100)
+            
+            if gross_dividend > 0:
+                client_ledger.append({
+                    "date": event_date,
+                    "symbol": symbol,
+                    "trn_no": "CORP_ACTION",
+                    "transaction_type": "Cash Dividend",
+                    "in_qty": 0,
+                    "out_qty": 0,
+                    "rate": 0,
+                    "gross_amount": round(gross_dividend, 4),
+                    "net_amount": round(gross_dividend * 0.95, 4),
+                    "fees": {},
+                    "capital_gain": 0,
+                    "cgt_total": round(gross_dividend * 0.05, 4),
+                    "cgt_5_pct": 0,
+                    "cgt_7_5_pct": 0,
+                    "wacc": round(get_current_wacc(wacc_state, symbol), 4),
+                    "balance_qty": current_balance[symbol],
+                    "remarks": f"{div_pct}% Cash Dividend",
+                })
 
-        client_ledger.append(
-            {
+    # --- PHASE 2: LISTING (Transfer provisional to tradable) ---
+    elif action_stage == "listing":
+        listed_qty = 0
+        total_cost = 0
+        
+        # Locate the specific provisional shares by ca_id
+        for batch in holdings[symbol]:
+            if batch.get("ca_id") == ca_id and batch.get("is_provisional"):
+                batch["is_provisional"] = False  # Mark as tradable
+                listed_qty += batch["qty"]
+                total_cost += batch.get("cost", batch["qty"] * batch["rate"])
+                
+        if listed_qty > 0:
+            # Now we update the WACC state since the shares are listed
+            wacc_state[symbol]["qty"] += listed_qty
+            wacc_state[symbol]["cost"] += total_cost
+            
+            txn_type = "Bonus Share (Listed)" if action_type == "bonus" else "Right Share (Listed)"
+            
+            client_ledger.append({
                 "date": event_date,
                 "symbol": symbol,
                 "trn_no": "CORP_ACTION",
-                "transaction_type": "Cash Dividend",
-                "in_qty": 0,
+                "transaction_type": txn_type,
+                "in_qty": 0, # Qty is already recorded in balance during Book Close
                 "out_qty": 0,
-                "rate": 0,
-                "gross_amount": round(gross_dividend, 4),
-                "net_amount": round(gross_dividend * 0.95, 4),
+                "rate": base_price,
+                "gross_amount": 0,
+                "net_amount": 0,
                 "fees": {},
                 "capital_gain": 0,
-                "cgt_total": round(gross_dividend * 0.05, 4),
+                "cgt_total": 0,
                 "cgt_5_pct": 0,
                 "cgt_7_5_pct": 0,
                 "wacc": round(get_current_wacc(wacc_state, symbol), 4),
                 "balance_qty": current_balance[symbol],
-                "remarks": f"{div_pct}% Cash Dividend",
-            }
-        )
+                "remarks": f"{listed_qty} shares transferred to tradable",
+            })
 
 
 def portfolio_calculation(ctx: dict):
@@ -393,9 +442,10 @@ def portfolio_calculation(ctx: dict):
                     row, meta, holdings, wacc_state, symbol, current_balance, client_ledger
                 )
 
-        elif source in ["bonus", "right", "cash_dividend"]:
+        elif source == "corporate_action":
+            # The action_type is now fetched directly inside the handler from meta
             handle_corporate_actions(
-                row, meta, holdings, wacc_state, symbol, current_balance, client_ledger, action_type=source
+                row, meta, holdings, wacc_state, symbol, current_balance, client_ledger
             )
 
     # --- Formatting final balance output ---

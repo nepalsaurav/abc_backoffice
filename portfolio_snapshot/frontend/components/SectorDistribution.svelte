@@ -1,126 +1,140 @@
 <script>
+  import { onMount } from "svelte";
+  import { api } from "@utils/api";
   import { Chart } from "chart.js/auto";
+  import Loading from "@components/Loading.svelte";
 
   let { holdings } = $props();
 
-  let canvasRef = $state(null);
+  // Tab State
+  let activeTab = $state("sector"); // can be "sector" or "symbol"
+
+  // We only need ONE canvas and ONE chart instance now
+  let chartCanvas = $state(null);
   let chartInstance = null;
-  let activeTab = $state("company");
 
-  const DEMO_SECTORS = ["Technology", "Finance", "Healthcare", "Energy", "Consumer Goods"];
+  // Data states
+  let sectorMap = $state({});
+  let isLoading = $state(true);
+  let error = $state(null);
 
-  $effect(() => {
-    if (!canvasRef || !holdings || holdings.length === 0) return;
-
-    let labels = [];
-    let data = [];
-    let quantities = [];
-
-    if (activeTab === "company") {
-      labels = holdings.map((item) => item[0]);
-      data = holdings.map((item) => item[1].qty * item[1].average_cost);
-      quantities = holdings.map((item) => item[1].qty);
-    } else if (activeTab === "sector") {
-      const sectorAggregation = {};
-
-      holdings.forEach((item, index) => {
-        const sector = DEMO_SECTORS[index % DEMO_SECTORS.length];
-        const value = item[1].qty * item[1].average_cost;
-        const qty = item[1].qty;
-
-        if (!sectorAggregation[sector]) {
-          sectorAggregation[sector] = { value: 0, qty: 0 };
-        }
-
-        sectorAggregation[sector].value += value;
-        sectorAggregation[sector].qty += qty;
+  // 1. Fetch Sector Data on Mount
+  onMount(() => {
+    api
+      .get("/api/portfolio_snapshot/nepse_sector/")
+      .then((res) => {
+        const map = {};
+        res.data.resp.forEach((item) => {
+          map[item.symbol] = item.sectorName;
+        });
+        sectorMap = map;
+      })
+      .catch((err) => {
+        error = err;
+        console.error("Failed to fetch sector data:", err);
+      })
+      .finally(() => {
+        isLoading = false;
       });
+  });
 
-      labels = Object.keys(sectorAggregation);
-      data = Object.values(sectorAggregation).map((s) => s.value);
-      quantities = Object.values(sectorAggregation).map((s) => s.qty);
-    }
+  // 2. Reactively Draw Chart when data or activeTab changes
+  $effect(() => {
+    // Wait until loading is done, holdings exist, and canvas is in the DOM
+    if (isLoading || !holdings || !chartCanvas) return;
 
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
+    const sectorTotals = {};
+    const symbolTotals = {};
 
-    chartInstance = new Chart(canvasRef, {
+    // Group the data
+    holdings.forEach((h) => {
+      const value = h.total_investment_amount ?? h.qty * h.wacc;
+      const symbol = h.symbol;
+      const sector = sectorMap[symbol] || "Unknown Sector";
+
+      symbolTotals[symbol] = (symbolTotals[symbol] || 0) + value;
+      sectorTotals[sector] = (sectorTotals[sector] || 0) + value;
+    });
+
+    // Determine which data to use based on the currently active tab
+    const chartData = activeTab === "sector" ? sectorTotals : symbolTotals;
+
+    // Destroy the previous chart before drawing the new one to prevent overlap
+    if (chartInstance) chartInstance.destroy();
+
+    const generateColors = (count) => {
+      return Array.from({ length: count }, (_, i) => `hsl(${(i * 360) / count}, 70%, 55%)`);
+    };
+
+    const tooltipOptions = {
+      callbacks: {
+        label: function (context) {
+          let label = context.label || "";
+          if (label) label += ": ";
+          label += "Rs. " + context.parsed.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+          return label;
+        },
+      },
+    };
+
+    // Draw the active chart
+    chartInstance = new Chart(chartCanvas, {
       type: "pie",
       data: {
-        labels: labels,
+        labels: Object.keys(chartData),
         datasets: [
           {
-            label: "Total Value",
-            data: data,
-            customQuantities: quantities,
-            backgroundColor: [
-              "#FF6384",
-              "#36A2EB",
-              "#FFCE56",
-              "#4BC0C0",
-              "#9966FF",
-              "#FF9F40",
-              "#C9CBCF",
-              "#FFCD56",
-              "#4BC0C0",
-              "#36A2EB",
-            ],
+            data: Object.values(chartData),
+            backgroundColor: generateColors(Object.keys(chartData).length),
+            borderWidth: 1,
           },
         ],
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
         plugins: {
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                let label = context.label || "";
-                if (label) {
-                  label += ": ";
-                }
-                const value = context.parsed;
-                label += new Intl.NumberFormat().format(value);
-                const qty = context.dataset.customQuantities[context.dataIndex];
-                label += ` (Qty: ${qty})`;
-                return label;
-              },
-            },
-          },
+          legend: { position: "bottom" },
+          tooltip: tooltipOptions,
         },
       },
     });
 
+    // Cleanup: Destroys the chart if the component is unmounted or if the effect re-runs
     return () => {
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
+      if (chartInstance) chartInstance.destroy();
     };
   });
 </script>
 
-<div style="display: flex;">
-  <div style="position: relative; height: 350px; width: 100%;">
-    {#if activeTab === "company"}
-      <p class="text-center fw-bold">Company Wise Distribution</p>
-    {:else}
-      <p class="text-center fw-bold">Sector Wise Distribution</p>
-    {/if}
-    <canvas bind:this={canvasRef}></canvas>
-  </div>
+{#if isLoading}
+  <Loading />
+{:else if error}
+  <div class="alert alert-danger">Error loading sector mapping: {error.message}</div>
+{:else}
+  <div class="card shadow-sm mt-4" style="max-width: 600px;">
+    <div class="card-header bg-white pb-0 border-bottom-0">
+      <ul class="nav nav-tabs">
+        <li class="nav-item">
+          <button
+            class="nav-link {activeTab === 'sector' ? 'active fw-bold' : 'text-muted'}"
+            onclick={() => (activeTab = "sector")}>
+            Sector Distribution
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            class="nav-link {activeTab === 'symbol' ? 'active fw-bold' : 'text-muted'}"
+            onclick={() => (activeTab = "symbol")}>
+            Symbol Distribution
+          </button>
+        </li>
+      </ul>
+    </div>
 
-  <div style="display: flex; flex-direction: column; justify-content: center;">
-    <button
-      onclick={() => (activeTab = "company")}
-      class="btn {activeTab === 'company' ? 'btn-primary' : 'btn-secondary'}">
-      Company
-    </button>
-
-    <button
-      onclick={() => (activeTab = "sector")}
-      class="btn mt-2 {activeTab === 'sector' ? 'btn-primary' : 'btn-secondary'}">
-      Sector
-    </button>
+    <div class="card-body d-flex flex-column align-items-center pt-4">
+      <div style="position: relative; width: 100%; max-width: 400px;">
+        <canvas bind:this={chartCanvas}></canvas>
+      </div>
+    </div>
   </div>
-</div>
+{/if}

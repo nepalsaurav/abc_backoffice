@@ -1,22 +1,48 @@
 <script>
+  import { onMount } from "svelte";
   import { api } from "@utils/api";
   import Loading from "@components/Loading.svelte";
   import TransactionsHistory from "../components/TransactionsHistory.svelte";
-  import CurrentHolding from "../components/CurrentHolding.svelte";
   import SectorDistribution from "../components/SectorDistribution.svelte";
   import Overview from "../components/Overview.svelte";
+    import ProfitAndLoss from "../components/ProfitAndLoss.svelte";
 
-  let client_name = $state("LATA CHAUDHARY (LC456959)");
+  // State for the Client Dropdown
+  let client_name = $state("");
+  let clientList = $state([]);
+  let isClientsLoading = $state(true);
+
+  // State for the Dashboard
   let portfolioDetails = $state(null);
   let error = $state(null);
   let activeTab = $state("overview");
+
+  // Fetch the list of customers exactly once when the component loads
+  onMount(() => {
+    api
+      .get("/api/portfolio_snapshot/customer_list/")
+      .then((res) => {
+        clientList = res.data.resp;
+        // Removed the auto-select logic so the user must choose manually
+      })
+      .catch((err) => {
+        console.error("Failed to load customer list:", err);
+      })
+      .finally(() => {
+        isClientsLoading = false;
+      });
+  });
 
   function setActiveTab(tab) {
     activeTab = tab;
   }
 
+  // Reactively fetch dashboard data whenever `client_name` changes
   $effect(() => {
-    // Reset states before fetching
+    // Prevent API call if client_name is empty (waiting for user selection)
+    if (!client_name) return;
+
+    // Reset states before fetching new client data
     portfolioDetails = null;
     error = null;
 
@@ -56,8 +82,31 @@
   }
 </script>
 
+<div class="mb-4 d-flex gap-4 align-items-center">
+  <label for="clientSelect" class="form-label fw-bold mb-0">Select Client</label>
+
+  {#if isClientsLoading}
+    <select class="form-select" disabled style="width: 20rem;">
+      <option>Loading clients...</option>
+    </select>
+  {:else if clientList.length === 0}
+    <select class="form-select" disabled style="width: 20rem;">
+      <option>No clients found</option>
+    </select>
+  {:else}
+    <select id="clientSelect" class="form-select" style="width: 20rem;" bind:value={client_name}>
+      <option value="" disabled selected>-- Select a Client --</option>
+      {#each clientList as client}
+        <option value={client}>{client}</option>
+      {/each}
+    </select>
+  {/if}
+</div>
+
 {#if error}
-  <p style="color: red;">Error: {error.message || error}</p>
+  <div class="alert alert-danger">Error: {error.message || error}</div>
+{:else if !client_name}
+  <div class="alert alert-info">Please select a client from the dropdown above to view their portfolio dashboard.</div>
 {:else if !portfolioDetails}
   <Loading />
 {:else}
@@ -69,13 +118,7 @@
         Overview
       </button>
     </li>
-    <li class="nav-item">
-      <button
-        class="nav-link {activeTab === 'holdings' ? 'active fw-bold' : ''}"
-        onclick={() => setActiveTab("holdings")}>
-        Current Holding
-      </button>
-    </li>
+  
     <li class="nav-item">
       <button class="nav-link {activeTab === 'sector' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("sector")}>
         Sector Distribution
@@ -99,15 +142,15 @@
     <Overview holdings={portfolioDetails.current_balance} />
   {/if}
 
-  {#if activeTab === "holdings"}
-    <!-- <CurrentHolding holdings={portfolioDetails.portfolio_history} /> -->
-  {/if}
-
   {#if activeTab === "sector"}
-    <SectorDistribution holdings={calculatePortfolioValue(portfolioDetails.portfolio_history)} />
+    <SectorDistribution holdings={portfolioDetails.current_balance} />
   {/if}
 
   {#if activeTab === "transaction_history"}
     <TransactionsHistory history={portfolioDetails.client_ledger} />
+  {/if}
+
+  {#if activeTab === "pnl"}
+    <ProfitAndLoss ledger={portfolioDetails.client_ledger} />
   {/if}
 {/if}

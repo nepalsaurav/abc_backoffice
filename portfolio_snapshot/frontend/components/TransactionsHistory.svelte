@@ -45,7 +45,7 @@
       case "cash dividend":
         return "bg-primary";
       default:
-        return "bg-secondary";
+        return "bg-success";
     }
   };
 
