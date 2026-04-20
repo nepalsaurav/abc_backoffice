@@ -15,9 +15,9 @@
     }, {});
 
     const h = holdings.map((element) => {
-      // Safely grab prices, fallback to 0 if something is completely missing
-      const currentPrice = priceMap[element.symbol]?.closePrice ?? priceMap[element.symbol]?.lastTradedPrice ?? 0;
-      const prevPrice = priceMap[element.symbol]?.previousClose ?? 0;
+      // Safely grab prices, fallback to 100 if something is completely missing (e.g., merged/halted companies)
+      const currentPrice = priceMap[element.symbol]?.closePrice ?? priceMap[element.symbol]?.lastTradedPrice ?? 100;
+      const prevPrice = priceMap[element.symbol]?.previousClose ?? 100;
 
       // Extract quantities based on your provided JSON structure
       const actualQty = element.qty || 0;
@@ -32,9 +32,14 @@
       const previousTotalValue = totalQty * prevPrice;
       const holdingDayChange = totalValue - previousTotalValue;
 
+      // Calculate Unrealized Gain/Loss
+      const wacc = element.wacc || 0;
+      const totalInvestment = totalQty * wacc;
+      const unrealizedGain = totalValue - totalInvestment;
+
       return {
         symbol: element.symbol,
-        wacc: element.wacc,
+        wacc: wacc,
         qty: actualQty,
         provisionalQty: provQty,
         totalQty: totalQty,
@@ -43,16 +48,20 @@
         provisionalValue: provisionalValue,
         totalValue: totalValue,
         dayChange: holdingDayChange,
+        totalInvestment: totalInvestment,
+        unrealizedGain: unrealizedGain,
       };
     });
 
     const currentPortfolioValue = h.reduce((total, e) => total + e.totalValue, 0);
     const totalDayChange = h.reduce((total, e) => total + e.dayChange, 0);
+    const totalUnrealizedGain = h.reduce((total, e) => total + e.unrealizedGain, 0);
 
     // Return the totals AND the array of individual holdings
     return {
       currentPortfolioValue,
       totalDayChange,
+      totalUnrealizedGain,
       individualHoldings: h,
     };
   }
@@ -63,25 +72,39 @@
 {:then value}
   {@const data = calculatePortfolioValue(props.holdings, value.data.resp)}
 
-  <div class="card shadow-sm mb-5" style="max-width: 400px;">
+  <div class="card shadow-sm mb-5" style="max-width: 450px;">
     <div class="card-body">
       <h6 class="card-subtitle mb-2 text-muted">Current Portfolio Value</h6>
 
-      <h2 class="card-title mb-1">
+      <h2 class="card-title mb-3">
         Rs. {data.currentPortfolioValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </h2>
 
-      <div class="d-flex align-items-center mt-3">
-        <span class="me-2 text-muted">Day Change:</span>
-        <span class="fw-bold {data.totalDayChange >= 0 ? 'text-success' : 'text-danger'}">
-          {data.totalDayChange >= 0 ? "+" : ""}{data.totalDayChange.toLocaleString("en-IN", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
-        </span>
+      <div class="d-flex justify-content-between align-items-center mt-3 border-top pt-3">
+        <div>
+          <span class="text-muted d-block" style="font-size: 0.9rem;">Day Change</span>
+          <span class="fw-bold {data.totalDayChange >= 0 ? 'text-success' : 'text-danger'}">
+            {data.totalDayChange >= 0 ? "+" : ""}{data.totalDayChange.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
+        <div class="text-end">
+          <span class="text-muted d-block" style="font-size: 0.9rem;">Total Unrealized Gain</span>
+          <span class="fw-bold {data.totalUnrealizedGain >= 0 ? 'text-success' : 'text-danger'}">
+            {data.totalUnrealizedGain >= 0 ? "+" : ""}{data.totalUnrealizedGain.toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
       </div>
 
-      <small class="text-muted mt-2 d-block">* Includes provisional shares</small>
+      <div class="mt-3 bg-light p-2 rounded">
+        <small class="text-muted d-block mb-1">* Includes provisional shares.</small>
+        <small class="text-muted d-block">** Disclaimer: For merged or unlisted companies where price data is unavailable, the current price is assumed as 100.</small>
+      </div>
     </div>
   </div>
 
@@ -99,6 +122,7 @@
           <th class="text-end">Prov. Value</th>
           <th class="text-end text-primary">Total Value</th>
           <th class="text-end">Day Change</th>
+          <th class="text-end">Unrealized Gain</th>
         </tr>
       </thead>
       <tbody>
@@ -130,10 +154,16 @@
                 maximumFractionDigits: 2,
               })}
             </td>
+            <td class="text-end fw-bold {item.unrealizedGain >= 0 ? 'text-success' : 'text-danger'}">
+              {item.unrealizedGain >= 0 ? "+" : ""}{item.unrealizedGain.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </td>
           </tr>
         {:else}
           <tr>
-            <td colspan="9" class="text-center py-4 text-muted">No holdings available.</td>
+            <td colspan="10" class="text-center py-4 text-muted">No holdings available.</td>
           </tr>
         {/each}
       </tbody>

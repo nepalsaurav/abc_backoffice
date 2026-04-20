@@ -225,6 +225,8 @@ def nepse_price(request):
     try:
         resp = nepse.getPriceVolume()
 
+    
+
         return JsonResponse(
             {
                 "status": "success",
