@@ -2,8 +2,10 @@ from collections import deque
 import json
 from django.db import connection
 
-BASE_PRICE = {"SHL": 10}
-DEFAULT_BASE_PRICE = 100
+from decimal import Decimal
+
+BASE_PRICE = {"SHL": Decimal('10')}
+DEFAULT_BASE_PRICE = Decimal('100')
 
 
 def combine_query(client_name: str):
@@ -154,7 +156,7 @@ def handle_buy_transactions(
 
 
 def handle_sell_transactions(
-    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger
+    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger, excess_sells
 ):
     sell_qty = meta.get("qty")
     sell_date = row.get("event_date")
@@ -190,7 +192,7 @@ def handle_sell_transactions(
 
         days_held = (sell_date - oldest["date"]).days
         is_long_term = days_held > 365
-        tax_rate = 0.05 if is_long_term else 0.075
+        tax_rate = Decimal('0.05') if is_long_term else Decimal('0.075')
 
         take_qty = min(oldest["qty"], units_to_process)
 
@@ -214,15 +216,22 @@ def handle_sell_transactions(
     if units_to_process > 0:
         if capital_gain > 0:
             fallback_profit = (units_to_process / sell_qty) * capital_gain
-            cgt_7_5_pct += fallback_profit * 0.075
+            cgt_7_5_pct += fallback_profit * Decimal('0.075')
+        
+        excess_qty = units_to_process
+        if symbol not in excess_sells:
+            excess_sells[symbol] = {"qty": Decimal('0'), "value": Decimal('0.0')}
+        excess_sells[symbol]["qty"] += excess_qty
+        excess_sells[symbol]["value"] += (excess_qty / sell_qty) * net_amount
+    else:
+        excess_qty = 0
 
-        units_to_process = 0
-
-    wacc_state[symbol]["qty"] -= sell_qty
+    qty_from_brokerage = sell_qty - excess_qty
+    wacc_state[symbol]["qty"] -= qty_from_brokerage
 
     if wacc_state[symbol]["qty"] <= 0:
-        wacc_state[symbol]["qty"] = 0
-        wacc_state[symbol]["cost"] = 0.0
+        wacc_state[symbol]["qty"] = Decimal('0')
+        wacc_state[symbol]["cost"] = Decimal('0.0')
     else:
         wacc_state[symbol]["cost"] = wacc_state[symbol]["qty"] * current_wacc
 
@@ -358,16 +367,16 @@ def handle_corporate_actions(
                     "symbol": symbol,
                     "trn_no": "CORP_ACTION",
                     "transaction_type": "Cash Dividend",
-                    "in_qty": 0,
-                    "out_qty": 0,
-                    "rate": 0,
+                    "in_qty": Decimal('0'),
+                    "out_qty": Decimal('0'),
+                    "rate": Decimal('0'),
                     "gross_amount": round(gross_dividend, 4),
-                    "net_amount": round(gross_dividend * 0.95, 4),
+                    "net_amount": round(gross_dividend * Decimal('0.95'), 4),
                     "fees": {},
-                    "capital_gain": 0,
-                    "cgt_total": round(gross_dividend * 0.05, 4),
-                    "cgt_5_pct": 0,
-                    "cgt_7_5_pct": 0,
+                    "capital_gain": Decimal('0'),
+                    "cgt_total": round(gross_dividend * Decimal('0.05'), 4),
+                    "cgt_5_pct": Decimal('0'),
+                    "cgt_7_5_pct": Decimal('0'),
                     "wacc": round(get_current_wacc(wacc_state, symbol), 4),
                     "balance_qty": current_balance[symbol],
                     "remarks": f"{div_pct}% Cash Dividend",
@@ -420,16 +429,17 @@ def portfolio_calculation(ctx: dict):
     current_balance = {}
     client_ledger = []
     wacc_state = {}
+    excess_sells = {}
 
     for row in query_results:
         source = row.get("source")
         symbol = row.get("symbol")
-        meta = json.loads(row.get("metadata"))
+        meta = json.loads(row.get("metadata"), parse_float=Decimal)
 
         if symbol not in holdings:
             holdings[symbol] = deque()
-            current_balance[symbol] = 0
-            wacc_state[symbol] = {"qty": 0, "cost": 0.0}
+            current_balance[symbol] = Decimal('0')
+            wacc_state[symbol] = {"qty": Decimal('0'), "cost": Decimal('0.0')}
 
         if source == "Transaction":
             trn_type = meta.get("trn_type")
@@ -439,7 +449,7 @@ def portfolio_calculation(ctx: dict):
                 )
             elif trn_type == "sell":
                 handle_sell_transactions(
-                    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger
+                    row, meta, holdings, wacc_state, symbol, current_balance, client_ledger, excess_sells
                 )
 
         elif source == "corporate_action":
@@ -465,7 +475,16 @@ def portfolio_calculation(ctx: dict):
                 "provisional_qty": provisional_qty
             })
 
+    formatted_excess = []
+    for sym, data in excess_sells.items():
+        formatted_excess.append({
+            "symbol": sym,
+            "qty": data["qty"],
+            "total_sales_value": round(data["value"], 4)
+        })
+
     return {
         "current_balance": formatted_balance,
-        "client_ledger": client_ledger
+        "client_ledger": client_ledger,
+        "excess_sells": formatted_excess
     }

@@ -6,6 +6,7 @@
   import SectorDistribution from "../components/SectorDistribution.svelte";
   import Overview from "../components/Overview.svelte";
     import ProfitAndLoss from "../components/ProfitAndLoss.svelte";
+    import CustomerSelect from "../components/CustomerSelect.svelte";
 
   // State for the Client Dropdown
   let client_name = $state("");
@@ -86,20 +87,13 @@
   <label for="clientSelect" class="form-label fw-bold mb-0">Select Client</label>
 
   {#if isClientsLoading}
-    <select class="form-select" disabled style="width: 20rem;">
-      <option>Loading clients...</option>
-    </select>
+    <div class="spinner-border spinner-border-sm text-primary" role="status">
+      <span class="visually-hidden">Loading clients...</span>
+    </div>
   {:else if clientList.length === 0}
-    <select class="form-select" disabled style="width: 20rem;">
-      <option>No clients found</option>
-    </select>
+    <div class="alert alert-warning mb-0 py-1 px-2">No clients found</div>
   {:else}
-    <select id="clientSelect" class="form-select" style="width: 20rem;" bind:value={client_name}>
-      <option value="" disabled selected>-- Select a Client --</option>
-      {#each clientList as client}
-        <option value={client}>{client}</option>
-      {/each}
-    </select>
+    <CustomerSelect customers={clientList} on:select={(e) => client_name = e.detail.customer} />
   {/if}
 </div>
 
@@ -118,10 +112,14 @@
         Overview
       </button>
     </li>
-  
     <li class="nav-item">
       <button class="nav-link {activeTab === 'sector' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("sector")}>
         Sector Distribution
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link {activeTab === 'pnl' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("pnl")}>
+        P&L
       </button>
     </li>
     <li class="nav-item">
@@ -129,11 +127,6 @@
         class="nav-link {activeTab === 'transaction_history' ? 'active fw-bold' : ''}"
         onclick={() => setActiveTab("transaction_history")}>
         Transaction History
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link {activeTab === 'pnl' ? 'active fw-bold' : ''}" onclick={() => setActiveTab("pnl")}>
-        P&L
       </button>
     </li>
   </ul>
@@ -151,6 +144,6 @@
   {/if}
 
   {#if activeTab === "pnl"}
-    <ProfitAndLoss ledger={portfolioDetails.client_ledger} />
+    <ProfitAndLoss ledger={portfolioDetails.client_ledger} excessSells={portfolioDetails.excess_sells} />
   {/if}
 {/if}

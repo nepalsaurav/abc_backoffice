@@ -36,6 +36,7 @@
       const wacc = element.wacc || 0;
       const totalInvestment = totalQty * wacc;
       const unrealizedGain = totalValue - totalInvestment;
+      const dayChangePercent = previousTotalValue > 0 ? (holdingDayChange / previousTotalValue) * 100 : 0;
 
       return {
         symbol: element.symbol,
@@ -48,6 +49,7 @@
         provisionalValue: provisionalValue,
         totalValue: totalValue,
         dayChange: holdingDayChange,
+        dayChangePercent: dayChangePercent,
         totalInvestment: totalInvestment,
         unrealizedGain: unrealizedGain,
       };
@@ -56,6 +58,12 @@
     const currentPortfolioValue = h.reduce((total, e) => total + e.totalValue, 0);
     const totalDayChange = h.reduce((total, e) => total + e.dayChange, 0);
     const totalUnrealizedGain = h.reduce((total, e) => total + e.unrealizedGain, 0);
+    
+    // Calculate totals for footer
+    const totalActualQty = h.reduce((total, e) => total + e.qty, 0);
+    const totalProvQty = h.reduce((total, e) => total + e.provisionalQty, 0);
+    const totalActualValue = h.reduce((total, e) => total + e.actualValue, 0);
+    const totalProvValue = h.reduce((total, e) => total + e.provisionalValue, 0);
 
     // Return the totals AND the array of individual holdings
     return {
@@ -63,6 +71,12 @@
       totalDayChange,
       totalUnrealizedGain,
       individualHoldings: h,
+      totals: {
+        qty: totalActualQty,
+        provQty: totalProvQty,
+        actualValue: totalActualValue,
+        provValue: totalProvValue,
+      }
     };
   }
 </script>
@@ -122,6 +136,7 @@
           <th class="text-end">Prov. Value</th>
           <th class="text-end text-primary">Total Value</th>
           <th class="text-end">Day Change</th>
+          <th class="text-end">Day Change %</th>
           <th class="text-end">Unrealized Gain</th>
         </tr>
       </thead>
@@ -154,6 +169,12 @@
                 maximumFractionDigits: 2,
               })}
             </td>
+            <td class="text-end fw-bold {item.dayChangePercent >= 0 ? 'text-success' : 'text-danger'}">
+              {item.dayChangePercent >= 0 ? "+" : ""}{item.dayChangePercent.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}%
+            </td>
             <td class="text-end fw-bold {item.unrealizedGain >= 0 ? 'text-success' : 'text-danger'}">
               {item.unrealizedGain >= 0 ? "+" : ""}{item.unrealizedGain.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
@@ -163,10 +184,30 @@
           </tr>
         {:else}
           <tr>
-            <td colspan="10" class="text-center py-4 text-muted">No holdings available.</td>
+            <td colspan="11" class="text-center py-4 text-muted">No holdings available.</td>
           </tr>
         {/each}
       </tbody>
+      {#if data.individualHoldings.length > 0}
+        <tfoot class="fw-bold table-light">
+          <tr>
+            <td>Total</td>
+            <td class="text-end">{data.totals.qty.toLocaleString("en-IN")}</td>
+            <td class="text-end {data.totals.provQty > 0 ? 'text-success' : ''}">{data.totals.provQty > 0 ? data.totals.provQty.toLocaleString("en-IN") : "-"}</td>
+            <td colspan="2"></td>
+            <td class="text-end">{data.totals.actualValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-end">{data.totals.provValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-end text-primary">{data.currentPortfolioValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-end {data.totalDayChange >= 0 ? 'text-success' : 'text-danger'}">
+              {data.totalDayChange >= 0 ? "+" : ""}{data.totalDayChange.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+            <td></td>
+            <td class="text-end {data.totalUnrealizedGain >= 0 ? 'text-success' : 'text-danger'}">
+              {data.totalUnrealizedGain >= 0 ? "+" : ""}{data.totalUnrealizedGain.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </td>
+          </tr>
+        </tfoot>
+      {/if}
     </table>
   </div>
 {:catch error}

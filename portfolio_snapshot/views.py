@@ -205,7 +205,15 @@ def portfolio_snapshot_dashboard(request):
 
     results = portfolio_calculation({"client_name": client_name})
 
-    return JsonResponse({"status": "success", "result": results})
+    from django.core.serializers.json import DjangoJSONEncoder
+    from decimal import Decimal
+    class FloatEncoder(DjangoJSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, Decimal):
+                return float(obj)
+            return super().default(obj)
+
+    return JsonResponse({"status": "success", "result": results}, encoder=FloatEncoder)
 
 
 def get_customer_list(request):
@@ -216,17 +224,12 @@ def get_customer_list(request):
 
 
 
-from nepse import Nepse
-nepse = Nepse()
-nepse.setTLSVerification(False)
+from portfolio_snapshot.services.market_data import market_data_service
 
 def nepse_price(request):
-
     try:
-        resp = nepse.getPriceVolume()
-
-    
-
+        symbol = request.GET.get("symbol")
+        resp = market_data_service.get_live_prices(symbol)
         return JsonResponse(
             {
                 "status": "success",
@@ -242,14 +245,10 @@ def nepse_price(request):
             },
             safe=False,
         )
-        pass
-
 
 def nepse_sector(request):
-    
-
     try:
-        resp = nepse.getCompanyList()
+        resp = market_data_service.get_enriched_data()
         return JsonResponse(
             {
                 "status": "success",
@@ -265,4 +264,3 @@ def nepse_sector(request):
             },
             safe=False,
         )
-        pass

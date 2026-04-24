@@ -1,83 +1,71 @@
 <script>
-  let { ledger = [] } = $props();
-
-  let activeTab = $state("summary");
+  let { ledger = [], excessSells = [] } = $props();
 
   let pnl = $derived.by(() => {
     const sellTransactions = ledger.filter((t) => t.transaction_type === "Sell");
 
-    let summary = {
-      salesValue: 0,
-      investmentCost: 0,
-      totalFees: 0,
-      grossCapitalGain: 0,
-      cgt: 0,
-      netProfit: 0,
-    };
+    const symbolMap = {};
+    let totalPurchase = 0;
+    let totalSales = 0;
+    let totalNet = 0;
+    let totalCgt = 0;
+    let totalFees = 0;
+    let totalGrossGain = 0;
 
-    const details = sellTransactions.map((t) => {
-      // Aggregate all fees
+    sellTransactions.forEach((t) => {
       const f = t.fees || {};
       const fees = (f.broker || 0) + (f.sebo || 0) + (f.nepse || 0) + (f.dp_charge || 0) + (f.regulatory || 0);
 
-      const salesValue = t.gross_amount || 0;
-      const investmentCost = (t.out_qty || 0) * (t.wacc || 0);
-      const grossGain = t.capital_gain || 0;
-      const cgt = t.cgt_total || 0;
-      const netProfit = grossGain - cgt;
+      const purchaseAmount = (t.out_qty || 0) * (t.wacc || 0);
+      const salesAmount = (t.net_amount || 0) - (t.cgt_total || 0);
+      const netAmount = salesAmount - purchaseAmount;
 
-      // Add to summary totals
-      summary.salesValue += salesValue;
-      summary.investmentCost += investmentCost;
-      summary.totalFees += fees;
-      summary.grossCapitalGain += grossGain;
-      summary.cgt += cgt;
-      summary.netProfit += netProfit;
-
-      return {
-        date: t.date,
-        trn_no: t.trn_no,
-        symbol: t.symbol,
-        qty: t.out_qty,
-        rate: t.rate,
-        wacc: t.wacc,
-        salesValue,
-        fees,
-        cgt,
-        grossGain,
-        netProfit,
-      };
-    });
-
-    const symbolMap = {};
-    details.forEach((d) => {
-      if (!symbolMap[d.symbol]) {
-        symbolMap[d.symbol] = {
-          symbol: d.symbol,
-          totalQty: 0,
-          salesValue: 0,
-          fees: 0,
-          cgt: 0,
-          grossGain: 0,
-          netProfit: 0,
+      if (!symbolMap[t.symbol]) {
+        symbolMap[t.symbol] = {
+          symbol: t.symbol,
+          qty: 0,
+          purchaseAmount: 0,
+          salesAmount: 0,
+          netAmount: 0,
         };
       }
-      symbolMap[d.symbol].totalQty += d.qty;
-      symbolMap[d.symbol].salesValue += d.salesValue;
-      symbolMap[d.symbol].fees += d.fees;
-      symbolMap[d.symbol].cgt += d.cgt;
-      symbolMap[d.symbol].grossGain += d.grossGain;
-      symbolMap[d.symbol].netProfit += d.netProfit;
+      symbolMap[t.symbol].qty += t.out_qty || 0;
+      symbolMap[t.symbol].purchaseAmount += purchaseAmount;
+      symbolMap[t.symbol].salesAmount += salesAmount;
+      symbolMap[t.symbol].netAmount += netAmount;
+
+      totalPurchase += purchaseAmount;
+      totalSales += salesAmount;
+      totalNet += netAmount;
+      totalCgt += t.cgt_total || 0;
+      totalFees += fees;
+      totalGrossGain += t.capital_gain || 0;
     });
 
     return {
-      summary,
-      grouped: Object.values(symbolMap).sort((a, b) => b.netProfit - a.netProfit),
-      details: details.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        summary: {
+            salesValue: sellTransactions.reduce((acc, t) => acc + (t.gross_amount || 0), 0),
+            investmentCost: totalPurchase,
+            totalFees,
+            grossCapitalGain: totalGrossGain,
+            cgt: totalCgt,
+            netProfit: totalNet,
+        },
+        grouped: Object.values(symbolMap).sort((a, b) => b.netAmount - a.netAmount).map(item => {
+            item.profitPercent = item.purchaseAmount > 0 ? (item.netAmount / item.purchaseAmount) * 100 : 0;
+            return item;
+        }),
+        totals: {
+            qty: Object.values(symbolMap).reduce((acc, item) => acc + item.qty, 0),
+            purchaseAmount: totalPurchase,
+            salesAmount: totalSales,
+            netAmount: totalNet,
+            profitPercent: totalPurchase > 0 ? (totalNet / totalPurchase) * 100 : 0
+        },
+        tradeCount: sellTransactions.length
     };
   });
 </script>
-
 
 <div class="container-fluid p-0 mt-4">
   <div class="row gx-4 mb-4">
@@ -134,7 +122,7 @@
             <h6 class="text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px; opacity: 0.8;">Performance Highlight</h6>
             <h4 class="mb-0">
               You have locked in <span class="fw-bold {pnl.summary.netProfit >= 0 ? 'text-success' : 'text-danger'}">
-                Rs. {pnl.summary.netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Rs. {Math.abs(pnl.summary.netProfit).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span> 
               in {pnl.summary.netProfit >= 0 ? 'profits' : 'losses'} after all taxes and fees.
             </h4>
@@ -154,7 +142,7 @@
           <div class="card shadow-sm border-0 h-100 text-dark" style="background-color: #f8f9fa;">
             <div class="card-body d-flex flex-column justify-content-center">
               <span class="small" style="opacity: 0.8;">Total Trades Analyzed</span>
-              <span class="fs-5 fw-medium">{pnl.details.length} Trades</span>
+              <span class="fs-5 fw-medium">{pnl.tradeCount} Trades</span>
             </div>
           </div>
         </div>
@@ -164,26 +152,7 @@
 
   <div class="card shadow-sm border-0 text-dark">
     <div class="card-header bg-white border-bottom pt-3 px-4">
-      <ul class="nav nav-tabs border-bottom-0 gap-3">
-        <li class="nav-item">
-          <button
-            class="nav-link border-0 {activeTab === 'summary' ? 'active fw-bold border-bottom border-primary border-3 text-dark' : 'bg-transparent'}"
-            style="border-radius: 0; padding-bottom: 12px; color: {activeTab === 'summary' ? 'inherit' : '#6c757d'};"
-            onclick={() => (activeTab = 'summary')}
-          >
-            Symbol-Wise Breakdown
-          </button>
-        </li>
-        <li class="nav-item">
-          <button
-            class="nav-link border-0 {activeTab === 'detailed' ? 'active fw-bold border-bottom border-primary border-3 text-dark' : 'bg-transparent'}"
-            style="border-radius: 0; padding-bottom: 12px; color: {activeTab === 'detailed' ? 'inherit' : '#6c757d'};"
-            onclick={() => (activeTab = 'detailed')}
-          >
-            Detailed Ledger
-          </button>
-        </li>
-      </ul>
+      <h5 class="fw-bold mb-0 pb-2">Squared off position</h5>
     </div>
 
     <div class="card-body p-0">
@@ -191,66 +160,80 @@
         <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
           <thead style="background-color: #f8f9fa;">
             <tr class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px; opacity: 0.8;">
-              {#if activeTab === 'detailed'}
-                <th class="ps-4">Date</th>
-              {/if}
-              <th class={activeTab === 'summary' ? 'ps-4' : ''}>Symbol</th>
+              <th class="ps-4">Symbol</th>
               <th class="text-end">Qty</th>
-              {#if activeTab === 'detailed'}
-                <th class="text-end">Rate</th>
-                <th class="text-end">WACC</th>
-              {/if}
-              <th class="text-end">Revenue</th>
-              <th class="text-end">Fees</th>
-              <th class="text-end">CGT</th>
-              <th class="text-end">Gross Gain</th>
-              <th class="text-end pe-4">Net Profit</th>
+              <th class="text-end">Purchase Amount (inc. fees)</th>
+              <th class="text-end">Sales Amount (net of fees/taxes)</th>
+              <th class="text-end">Net Amount</th>
+              <th class="text-end pe-4">Profit %</th>
             </tr>
           </thead>
           <tbody>
-            {#if activeTab === 'summary'}
-              {#each pnl.grouped as item}
-                <tr>
-                  <td class="fw-bold ps-4">{item.symbol}</td>
-                  <td class="text-end">{item.totalQty.toLocaleString("en-IN")}</td>
-                  <td class="text-end">{item.salesValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                  <td class="text-end">({item.fees.toLocaleString("en-IN", { minimumFractionDigits: 2 })})</td>
-                  <td class="text-end">({item.cgt.toLocaleString("en-IN", { minimumFractionDigits: 2 })})</td>
-                  <td class="text-end {item.grossGain >= 0 ? 'text-success' : 'text-danger'}">
-                    {item.grossGain.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td class="text-end fw-bold pe-4 {item.netProfit >= 0 ? 'text-success' : 'text-danger'}">
-                    {item.netProfit >= 0 ? "+" : ""}{item.netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              {:else}
-                <tr><td colspan="7" class="text-center py-5" style="opacity: 0.7;">No realized profit or loss available.</td></tr>
-              {/each}
+            {#each pnl.grouped as item}
+              <tr>
+                <td class="fw-bold ps-4">{item.symbol}</td>
+                <td class="text-end">{item.qty.toLocaleString("en-IN")}</td>
+                <td class="text-end">{item.purchaseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end">{item.salesAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end fw-bold {item.netAmount >= 0 ? 'text-success' : 'text-danger'}">
+                  {item.netAmount >= 0 ? "+" : ""}{item.netAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td class="text-end pe-4 {item.profitPercent >= 0 ? 'text-success' : 'text-danger'}">
+                  {item.profitPercent.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                </td>
+              </tr>
             {:else}
-              {#each pnl.details as item}
-                <tr>
-                  <td class="text-nowrap ps-4" style="opacity: 0.9;">{item.date}</td>
-                  <td class="fw-bold">{item.symbol}</td>
-                  <td class="text-end">{item.qty.toLocaleString("en-IN")}</td>
-                  <td class="text-end">{item.rate.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                  <td class="text-end">{item.wacc.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                  <td class="text-end">{item.salesValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                  <td class="text-end">({item.fees.toLocaleString("en-IN", { minimumFractionDigits: 2 })})</td>
-                  <td class="text-end">({item.cgt.toLocaleString("en-IN", { minimumFractionDigits: 2 })})</td>
-                  <td class="text-end {item.grossGain >= 0 ? 'text-success' : 'text-danger'}">
-                    {item.grossGain.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td class="text-end fw-bold pe-4 {item.netProfit >= 0 ? 'text-success' : 'text-danger'}">
-                    {item.netProfit >= 0 ? "+" : ""}{item.netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              {:else}
-                <tr><td colspan="10" class="text-center py-5" style="opacity: 0.7;">No sell transactions found.</td></tr>
-              {/each}
-            {/if}
+              <tr><td colspan="6" class="text-center py-5" style="opacity: 0.7;">No realized profit or loss available.</td></tr>
+            {/each}
           </tbody>
+          {#if pnl.grouped.length > 0}
+            <tfoot class="fw-bold" style="background-color: #f8f9fa;">
+              <tr>
+                <td class="ps-4">Total</td>
+                <td class="text-end">{pnl.totals.qty.toLocaleString("en-IN")}</td>
+                <td class="text-end">{pnl.totals.purchaseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end">{pnl.totals.salesAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end {pnl.totals.netAmount >= 0 ? 'text-success' : 'text-danger'}">
+                  {pnl.totals.netAmount >= 0 ? "+" : ""}{pnl.totals.netAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td class="text-end pe-4 {pnl.totals.profitPercent >= 0 ? 'text-success' : 'text-danger'}">
+                  {pnl.totals.profitPercent.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                </td>
+              </tr>
+            </tfoot>
+          {/if}
         </table>
       </div>
     </div>
   </div>
+
+  {#if excessSells && excessSells.length > 0}
+    <div class="card shadow-sm border-0 text-dark mt-4" style="border: 1px solid #d97706 !important;">
+      <div class="card-header bg-white border-bottom pt-3 px-4" style="color: #d97706;">
+        <h5 class="fw-bold mb-0 pb-2">Excess Sells (Shorts / Discrepancies)</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+            <thead style="background-color: #f8f9fa;">
+              <tr class="text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px; opacity: 0.8;">
+                <th class="ps-4">Symbol</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end pe-4">Sales Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each excessSells as item}
+                <tr>
+                  <td class="fw-bold ps-4">{item.symbol}</td>
+                  <td class="text-end">{item.qty.toLocaleString("en-IN")}</td>
+                  <td class="text-end pe-4">{item.total_sales_value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>

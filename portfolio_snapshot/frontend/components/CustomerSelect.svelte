@@ -6,15 +6,7 @@
     let isDropdownOpen = false;
     let selectedCustomer = null;
     
-    let customers = [
-        "Acme Corp",
-        "Global Industries",
-        "Stark Enterprises",
-        "Wayne Enterprises",
-        "Cyberdyne Systems",
-        "Umbrella Corporation",
-        "Massive Dynamic"
-    ];
+    export let customers = [];
 
     $: filteredCustomers = customers.filter(c => 
         c.toLowerCase().includes(searchQuery.toLowerCase())
@@ -44,14 +36,15 @@
 </script>
 
 <div class="customer-select position-relative">
-    <div class="input-group shadow-sm">
-        <span class="input-group-text bg-white border-end-0 text-muted">
-            <!-- Icon placeholder if Bootstrap Icons is not present, otherwise it will just render safely -->
-            <i class="bi bi-person-fill"></i>
+    <div class="input-group shadow-sm search-container rounded">
+        <span class="input-group-text bg-white border-0 text-muted px-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
         </span>
         <input 
             type="text" 
-            class="form-control border-start-0 ps-0 fw-medium" 
+            class="form-control border-0 ps-2 fw-medium shadow-none py-2" 
             bind:value={searchQuery} 
             on:input={handleInput}
             on:focus={() => isDropdownOpen = true}
@@ -59,24 +52,26 @@
             placeholder="Search and select customer..." 
         />
         {#if searchQuery}
-            <button class="btn btn-outline-secondary border-start-0 border text-muted bg-white" type="button" aria-label="Clear search" on:click={() => {searchQuery = ''; isDropdownOpen = true;}}>
-                <i class="bi bi-x"></i>
+            <button class="btn border-0 text-muted bg-white px-3" type="button" aria-label="Clear search" on:click={() => {searchQuery = ''; isDropdownOpen = true;}}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
+                  <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                </svg>
             </button>
         {/if}
     </div>
 
     {#if isDropdownOpen && filteredCustomers.length > 0}
-        <ul class="dropdown-menu show w-100 position-absolute mt-1 shadow border-0" style="max-height: 250px; overflow-y: auto; z-index: 1050;">
+        <ul class="dropdown-menu show w-100 position-absolute mt-2 shadow-lg border-0 rounded-3 p-1" style="max-height: 280px; overflow-y: auto; overflow-x: hidden; z-index: 1050;">
             {#each filteredCustomers as customer}
                 <li>
-                    <button class="dropdown-item py-2 {selectedCustomer === customer ? 'active' : ''}" on:click={() => selectCustomer(customer)}>
+                    <button class="dropdown-item py-2 px-3 rounded-2 text-truncate {selectedCustomer === customer ? 'active' : ''}" on:click={() => selectCustomer(customer)} title={customer}>
                         {customer}
                     </button>
                 </li>
             {/each}
         </ul>
     {:else if isDropdownOpen && filteredCustomers.length === 0}
-        <ul class="dropdown-menu show w-100 position-absolute mt-1 shadow border-0 p-3 text-center text-muted h-auto">
+        <ul class="dropdown-menu show w-100 position-absolute mt-2 shadow-lg border-0 p-3 text-center text-muted h-auto rounded-3">
             <small>No customers found</small>
         </ul>
     {/if}
@@ -84,15 +79,45 @@
 
 <style>
     .customer-select {
-        min-width: 320px;
+        min-width: 420px;
+    }
+    .search-container {
+        border: 1px solid #dee2e6;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    .search-container:focus-within {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    .dropdown-item {
+        transition: all 0.1s ease;
+        font-size: 0.95rem;
+    }
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
     }
     .dropdown-item:active {
-        background-color: #f8f9fa;
+        background-color: #e9ecef;
         color: #212529;
     }
     .dropdown-item.active {
-        background-color: #e9ecef;
+        background-color: #eff6ff;
         color: #0d6efd;
         font-weight: 600;
+    }
+    
+    /* Custom scrollbar for a more premium look */
+    .dropdown-menu::-webkit-scrollbar {
+        width: 6px;
+    }
+    .dropdown-menu::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .dropdown-menu::-webkit-scrollbar-thumb {
+        background: #ced4da;
+        border-radius: 10px;
+    }
+    .dropdown-menu::-webkit-scrollbar-thumb:hover {
+        background: #adb5bd;
     }
 </style>
