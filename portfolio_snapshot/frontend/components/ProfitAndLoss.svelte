@@ -43,26 +43,28 @@
     });
 
     return {
-        summary: {
-            salesValue: sellTransactions.reduce((acc, t) => acc + (t.gross_amount || 0), 0),
-            investmentCost: totalPurchase,
-            totalFees,
-            grossCapitalGain: totalGrossGain,
-            cgt: totalCgt,
-            netProfit: totalNet,
-        },
-        grouped: Object.values(symbolMap).sort((a, b) => b.netAmount - a.netAmount).map(item => {
-            item.profitPercent = item.purchaseAmount > 0 ? (item.netAmount / item.purchaseAmount) * 100 : 0;
-            return item;
+      summary: {
+        salesValue: sellTransactions.reduce((acc, t) => acc + (t.gross_amount || 0), 0),
+        investmentCost: totalPurchase,
+        totalFees,
+        grossCapitalGain: totalGrossGain,
+        cgt: totalCgt,
+        netProfit: totalNet,
+      },
+      grouped: Object.values(symbolMap)
+        .sort((a, b) => b.netAmount - a.netAmount)
+        .map((item) => {
+          item.profitPercent = item.purchaseAmount > 0 ? (item.netAmount / item.purchaseAmount) * 100 : 0;
+          return item;
         }),
-        totals: {
-            qty: Object.values(symbolMap).reduce((acc, item) => acc + item.qty, 0),
-            purchaseAmount: totalPurchase,
-            salesAmount: totalSales,
-            netAmount: totalNet,
-            profitPercent: totalPurchase > 0 ? (totalNet / totalPurchase) * 100 : 0
-        },
-        tradeCount: sellTransactions.length
+      totals: {
+        qty: Object.values(symbolMap).reduce((acc, item) => acc + item.qty, 0),
+        purchaseAmount: totalPurchase,
+        salesAmount: totalSales,
+        netAmount: totalNet,
+        profitPercent: totalPurchase > 0 ? (totalNet / totalPurchase) * 100 : 0,
+      },
+      tradeCount: sellTransactions.length,
     };
   });
 </script>
@@ -78,37 +80,59 @@
         <div class="card-body">
           <div class="d-flex justify-content-between mb-2">
             <span>Total Sales Revenue</span>
-            <span class="fw-medium">Rs. {pnl.summary.salesValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="fw-medium"
+              >Rs. {pnl.summary.salesValue.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</span>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span>Less: Investment Cost (WACC)</span>
-            <span>(Rs. {pnl.summary.investmentCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+            <span
+              >(Rs. {pnl.summary.investmentCost.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })})</span>
           </div>
           <div class="d-flex justify-content-between mb-3">
             <span>Less: Trading Fees</span>
-            <span>(Rs. {pnl.summary.totalFees.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+            <span
+              >(Rs. {pnl.summary.totalFees.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })})</span>
           </div>
-          
+
           <hr style="opacity: 0.2;" />
-          
+
           <div class="d-flex justify-content-between mb-3">
             <span class="fw-bold">Gross Capital Gain</span>
             <span class="fw-bold {pnl.summary.grossCapitalGain >= 0 ? 'text-success' : 'text-danger'}">
-              Rs. {pnl.summary.grossCapitalGain.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Rs. {pnl.summary.grossCapitalGain.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
           </div>
-          
+
           <div class="d-flex justify-content-between mb-3">
             <span>Less: Capital Gains Tax (CGT)</span>
-            <span>(Rs. {pnl.summary.cgt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+            <span
+              >(Rs. {pnl.summary.cgt.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })})</span>
           </div>
 
           <hr style="opacity: 0.5;" />
-          
+
           <div class="d-flex justify-content-between align-items-center mt-2">
             <span class="fw-bold fs-5">Net Realized Profit</span>
             <span class="fw-bold fs-4 {pnl.summary.netProfit >= 0 ? 'text-success' : 'text-danger'}">
-              {pnl.summary.netProfit >= 0 ? "+" : ""} Rs. {pnl.summary.netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {pnl.summary.netProfit >= 0 ? "+" : ""} Rs. {pnl.summary.netProfit.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
           </div>
         </div>
@@ -119,12 +143,17 @@
       <div class="card shadow-sm border-0 flex-grow-1 text-dark">
         <div class="card-body d-flex align-items-center">
           <div>
-            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px; opacity: 0.8;">Performance Highlight</h6>
+            <h6 class="text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px; opacity: 0.8;">
+              Performance Highlight
+            </h6>
             <h4 class="mb-0">
               You have locked in <span class="fw-bold {pnl.summary.netProfit >= 0 ? 'text-success' : 'text-danger'}">
-                Rs. {Math.abs(pnl.summary.netProfit).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span> 
-              in {pnl.summary.netProfit >= 0 ? 'profits' : 'losses'} after all taxes and fees.
+                Rs. {Math.abs(pnl.summary.netProfit).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              in {pnl.summary.netProfit >= 0 ? "profits" : "losses"} after all taxes and fees.
             </h4>
           </div>
         </div>
@@ -134,7 +163,8 @@
           <div class="card shadow-sm border-0 h-100 text-dark" style="background-color: #f8f9fa;">
             <div class="card-body d-flex flex-column justify-content-center">
               <span class="small" style="opacity: 0.8;">Total Tax Contributions</span>
-              <span class="fs-5 fw-medium">Rs. {pnl.summary.cgt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              <span class="fs-5 fw-medium"
+                >Rs. {pnl.summary.cgt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
@@ -173,17 +203,31 @@
               <tr>
                 <td class="fw-bold ps-4">{item.symbol}</td>
                 <td class="text-end">{item.qty.toLocaleString("en-IN")}</td>
-                <td class="text-end">{item.purchaseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="text-end">{item.salesAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end"
+                  >{item.purchaseAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</td>
+                <td class="text-end"
+                  >{item.salesAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</td>
                 <td class="text-end fw-bold {item.netAmount >= 0 ? 'text-success' : 'text-danger'}">
-                  {item.netAmount >= 0 ? "+" : ""}{item.netAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {item.netAmount >= 0 ? "+" : ""}{item.netAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
                 <td class="text-end pe-4 {item.profitPercent >= 0 ? 'text-success' : 'text-danger'}">
                   {item.profitPercent.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                 </td>
               </tr>
             {:else}
-              <tr><td colspan="6" class="text-center py-5" style="opacity: 0.7;">No realized profit or loss available.</td></tr>
+              <tr
+                ><td colspan="6" class="text-center py-5" style="opacity: 0.7;"
+                  >No realized profit or loss available.</td
+                ></tr>
             {/each}
           </tbody>
           {#if pnl.grouped.length > 0}
@@ -191,13 +235,27 @@
               <tr>
                 <td class="ps-4">Total</td>
                 <td class="text-end">{pnl.totals.qty.toLocaleString("en-IN")}</td>
-                <td class="text-end">{pnl.totals.purchaseAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="text-end">{pnl.totals.salesAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="text-end"
+                  >{pnl.totals.purchaseAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</td>
+                <td class="text-end"
+                  >{pnl.totals.salesAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</td>
                 <td class="text-end {pnl.totals.netAmount >= 0 ? 'text-success' : 'text-danger'}">
-                  {pnl.totals.netAmount >= 0 ? "+" : ""}{pnl.totals.netAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {pnl.totals.netAmount >= 0 ? "+" : ""}{pnl.totals.netAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </td>
                 <td class="text-end pe-4 {pnl.totals.profitPercent >= 0 ? 'text-success' : 'text-danger'}">
-                  {pnl.totals.profitPercent.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                  {pnl.totals.profitPercent.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}%
                 </td>
               </tr>
             </tfoot>
@@ -210,7 +268,7 @@
   {#if excessSells && excessSells.length > 0}
     <div class="card shadow-sm border-0 text-dark mt-4" style="border: 1px solid #d97706 !important;">
       <div class="card-header bg-white border-bottom pt-3 px-4" style="color: #d97706;">
-        <h5 class="fw-bold mb-0 pb-2">Excess Sells (Shorts / Discrepancies)</h5>
+        <h5 class="fw-bold mb-0 pb-2">Excess Sells (Discrepancies)</h5>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -227,7 +285,11 @@
                 <tr>
                   <td class="fw-bold ps-4">{item.symbol}</td>
                   <td class="text-end">{item.qty.toLocaleString("en-IN")}</td>
-                  <td class="text-end pe-4">{item.total_sales_value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="text-end pe-4"
+                    >{item.total_sales_value.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}</td>
                 </tr>
               {/each}
             </tbody>
